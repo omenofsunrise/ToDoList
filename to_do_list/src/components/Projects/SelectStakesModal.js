@@ -22,36 +22,92 @@ const SelectStakesModal = ({
   allStakes,
   selectedProjectForStakes,
   setSelectedProjectForStakes,
+  stakesByProjectId, // Добавляем пропс с стейкхолдерами проекта
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const queryClient = useQueryClient();
 
-  const linkStakeToProject = async ({ stakeholderId, projectId }) => {
+  // Получаем ID стейкхолдеров, уже связанных с проектом
+  const getCurrentProjectStakeIds = () => {
+    if (!selectedProjectForStakes) return [];
+    const projectStakes = stakesByProjectId[selectedProjectForStakes.idProject] || [];
+    return projectStakes.map(stake => stake.idStake);
+  };
+
+  // Состояние для отслеживания выбранных стейкхолдеров
+  const [selectedStakeIds, setSelectedStakeIds] = React.useState(getCurrentProjectStakeIds());
+
+  // Обновляем выбранные стейкхолдеры при изменении проекта
+  React.useEffect(() => {
+    setSelectedStakeIds(getCurrentProjectStakeIds());
+  }, [selectedProjectForStakes]);
+
+  // Функция для выполнения запроса
+  const linkStakeToProject = async ({ stakeId, projectId }) => {
     const response = await client.post(
-      `/api/Stake/LinkToProject?stakeholder_id=${stakeholderId}&project_id=${projectId}`
+      `/api/Stake/LinkToProject?stakeholder_id=${stakeId}&project_id=${projectId}`
     );
     return response.data;
   };
 
-  const linkStakeToProjectMutation = useMutation({
-    mutationFn: linkStakeToProject,
+  const unlinkStakeFromProject = async ({ stakeId, projectId }) => {
+    const response = await client.post(
+      `/api/Stake/RemoveFromProject?stakeholder_id=${stakeId}&project_id=${projectId}`
+    );
+    return response.data;
+  };
+
+  // Мутация для связывания/отвязывания стейкхолдера с проектом
+  const stakeMutation = useMutation({
+    mutationFn: async ({ stakeId, projectId, shouldLink }) => {
+      if (shouldLink) {
+        return linkStakeToProject({ stakeId, projectId });
+      } else {
+        return unlinkStakeFromProject({ stakeId, projectId });
+      }
+    },
     onSuccess: () => {
-      console.log('Стейкхолдер успешно добавлен в проект');
       queryClient.invalidateQueries(['projects']);
+      queryClient.invalidateQueries(['stakes']);
     },
     onError: (error) => {
-      console.error('Ошибка при добавлении стейкхолдера в проект:', error);
+      console.error('Ошибка при изменении связи стейкхолдера с проектом:', error);
     },
   });
 
-  const handleSelectStakes = (selectedStakes) => {
+  // Обработчик изменения состояния чекбокса
+  const handleStakeToggle = (stakeId) => {
+    const newSelectedStakeIds = selectedStakeIds.includes(stakeId)
+      ? selectedStakeIds.filter(id => id !== stakeId)
+      : [...selectedStakeIds, stakeId];
+    
+    setSelectedStakeIds(newSelectedStakeIds);
+  };
+
+  // Обработчик сохранения выбранных стейкхолдеров
+  const handleSaveStakes = () => {
     if (!selectedProjectForStakes) return;
 
-    selectedStakes.forEach((stakeholderId) => {
-      linkStakeToProjectMutation.mutate({
-        stakeholderId,
+    // Определяем, какие стейкхолдеры нужно добавить, а какие удалить
+    const currentStakeIds = getCurrentProjectStakeIds();
+    const stakesToAdd = selectedStakeIds.filter(id => !currentStakeIds.includes(id));
+    const stakesToRemove = currentStakeIds.filter(id => !selectedStakeIds.includes(id));
+
+    // Выполняем мутации для добавления/удаления стейкхолдеров
+    stakesToAdd.forEach(stakeId => {
+      stakeMutation.mutate({
+        stakeId,
         projectId: selectedProjectForStakes.idProject,
+        shouldLink: true
+      });
+    });
+
+    stakesToRemove.forEach(stakeId => {
+      stakeMutation.mutate({
+        stakeId,
+        projectId: selectedProjectForStakes.idProject,
+        shouldLink: false
       });
     });
 
@@ -61,7 +117,7 @@ const SelectStakesModal = ({
   return (
     <Modal open={selectStakesModalOpen} onClose={() => setSelectStakesModalOpen(false)}>
       <Box
-        onClick={(e) => e.stopPropagation()} // Останавливаем всплытие для всего окна
+        onClick={(e) => e.stopPropagation()}
         sx={{
           position: 'absolute',
           top: '50%',
@@ -90,21 +146,13 @@ const SelectStakesModal = ({
           {allStakes.map((stake) => (
             <ListItem key={stake.idStake}>
               <Checkbox
-                checked={selectedProjectForStakes?.stakeholderIds?.includes(stake.idStake)}
-                onChange={(e) => {
-                  const selectedStakes = selectedProjectForStakes.stakeholderIds || [];
-                  if (e.target.checked) {
-                    selectedStakes.push(stake.idStake);
-                  } else {
-                    const index = selectedStakes.indexOf(stake.idStake);
-                    if (index > -1) {
-                      selectedStakes.splice(index, 1);
-                    }
-                  }
-                  setSelectedProjectForStakes({ ...selectedProjectForStakes, stakeholderIds: selectedStakes });
-                }}
+                checked={selectedStakeIds.includes(stake.idStake)}
+                onChange={() => handleStakeToggle(stake.idStake)}
               />
-              <ListItemText primary={stake.nameStake} secondary={stake.AbNameStake} />
+              <ListItemText 
+                primary={stake.nameStake} 
+                secondary={stake.abNameStake || stake.AbNameStake} 
+              />
             </ListItem>
           ))}
         </List>
@@ -112,10 +160,11 @@ const SelectStakesModal = ({
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
           <Button
             variant="contained"
-            onClick={() => handleSelectStakes(selectedProjectForStakes.stakeholderIds)}
+            onClick={handleSaveStakes}
             sx={{ boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}
+            disabled={stakeMutation.isLoading}
           >
-            Сохранить
+            {stakeMutation.isLoading ? 'Сохранение...' : 'Сохранить'}
           </Button>
         </Box>
       </Box>
