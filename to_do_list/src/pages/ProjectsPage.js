@@ -757,7 +757,7 @@ const removeUserFromProjectMutation = useMutation({
   allGoals={allGoals}
   selectedProjectForGoals={selectedProjectForGoals}
   setSelectedProjectForGoals={setSelectedProjectForGoals}
-  goalsByProjectId={goalsByProjectId} // Передаем цели проекта
+  goalsByProjectId={goalsByProjectId}
 />
   <Divider orientation="vertical" flexItem sx={{ borderRightWidth: 2, borderColor: 'primary.main', mx: 2 }} />
 
@@ -885,7 +885,7 @@ const removeUserFromProjectMutation = useMutation({
     allStakes={allStakes}
     selectedProjectForStakes={selectedProjectForStakes}
     setSelectedProjectForStakes={setSelectedProjectForStakes}
-    stakesByProjectId={stakesByProjectId} // Передаем стейкхолдеров проекта
+    stakesByProjectId={stakesByProjectId}
   />
   <Box sx={{ ml: isMobile ? 0 : 2, mt: isMobile ? 2 : 0 }}>
     {expandedProjectId === project.idProject ? <ExpandLess /> : <ExpandMore />}

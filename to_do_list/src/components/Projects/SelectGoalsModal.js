@@ -22,28 +22,24 @@ const SelectGoalsModal = ({
   allGoals,
   selectedProjectForGoals,
   setSelectedProjectForGoals,
-  goalsByProjectId, // Добавляем пропс с целями проекта
+  goalsByProjectId,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const queryClient = useQueryClient();
 
-  // Получаем ID целей, уже связанных с проектом
   const getCurrentProjectGoalIds = () => {
     if (!selectedProjectForGoals) return [];
     const projectGoals = goalsByProjectId[selectedProjectForGoals.idProject] || [];
     return projectGoals.map(goal => goal.idGoal);
   };
 
-  // Состояние для отслеживания выбранных целей
   const [selectedGoalIds, setSelectedGoalIds] = React.useState(getCurrentProjectGoalIds());
 
-  // Обновляем выбранные цели при изменении проекта
   React.useEffect(() => {
     setSelectedGoalIds(getCurrentProjectGoalIds());
   }, [selectedProjectForGoals]);
 
-  // Функция для выполнения запроса
   const linkGoalToProject = async ({ goalId, projectId }) => {
     const response = await client.post(`/api/Goal/LinkToProject?goal_id=${goalId}&project_id=${projectId}`);
     return response.data;
@@ -54,7 +50,6 @@ const SelectGoalsModal = ({
     return response.data;
   };
 
-  // Мутация для связывания/отвязывания цели с проектом
   const goalMutation = useMutation({
     mutationFn: async ({ goalId, projectId, shouldLink }) => {
       if (shouldLink) {
@@ -72,7 +67,6 @@ const SelectGoalsModal = ({
     },
   });
 
-  // Обработчик изменения состояния чекбокса
   const handleGoalToggle = (goalId) => {
     const newSelectedGoalIds = selectedGoalIds.includes(goalId)
       ? selectedGoalIds.filter(id => id !== goalId)
@@ -81,16 +75,13 @@ const SelectGoalsModal = ({
     setSelectedGoalIds(newSelectedGoalIds);
   };
 
-  // Обработчик сохранения выбранных целей
   const handleSaveGoals = () => {
     if (!selectedProjectForGoals) return;
 
-    // Определяем, какие цели нужно добавить, а какие удалить
     const currentGoalIds = getCurrentProjectGoalIds();
     const goalsToAdd = selectedGoalIds.filter(id => !currentGoalIds.includes(id));
     const goalsToRemove = currentGoalIds.filter(id => !selectedGoalIds.includes(id));
 
-    // Выполняем мутации для добавления/удаления целей
     goalsToAdd.forEach(goalId => {
       goalMutation.mutate({
         goalId,

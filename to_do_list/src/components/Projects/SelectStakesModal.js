@@ -22,28 +22,24 @@ const SelectStakesModal = ({
   allStakes,
   selectedProjectForStakes,
   setSelectedProjectForStakes,
-  stakesByProjectId, // Добавляем пропс с стейкхолдерами проекта
+  stakesByProjectId,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const queryClient = useQueryClient();
 
-  // Получаем ID стейкхолдеров, уже связанных с проектом
   const getCurrentProjectStakeIds = () => {
     if (!selectedProjectForStakes) return [];
     const projectStakes = stakesByProjectId[selectedProjectForStakes.idProject] || [];
     return projectStakes.map(stake => stake.idStake);
   };
 
-  // Состояние для отслеживания выбранных стейкхолдеров
   const [selectedStakeIds, setSelectedStakeIds] = React.useState(getCurrentProjectStakeIds());
 
-  // Обновляем выбранные стейкхолдеры при изменении проекта
   React.useEffect(() => {
     setSelectedStakeIds(getCurrentProjectStakeIds());
   }, [selectedProjectForStakes]);
 
-  // Функция для выполнения запроса
   const linkStakeToProject = async ({ stakeId, projectId }) => {
     const response = await client.post(
       `/api/Stake/LinkToProject?stakeholder_id=${stakeId}&project_id=${projectId}`
@@ -58,7 +54,6 @@ const SelectStakesModal = ({
     return response.data;
   };
 
-  // Мутация для связывания/отвязывания стейкхолдера с проектом
   const stakeMutation = useMutation({
     mutationFn: async ({ stakeId, projectId, shouldLink }) => {
       if (shouldLink) {
@@ -76,7 +71,6 @@ const SelectStakesModal = ({
     },
   });
 
-  // Обработчик изменения состояния чекбокса
   const handleStakeToggle = (stakeId) => {
     const newSelectedStakeIds = selectedStakeIds.includes(stakeId)
       ? selectedStakeIds.filter(id => id !== stakeId)
@@ -85,16 +79,13 @@ const SelectStakesModal = ({
     setSelectedStakeIds(newSelectedStakeIds);
   };
 
-  // Обработчик сохранения выбранных стейкхолдеров
   const handleSaveStakes = () => {
     if (!selectedProjectForStakes) return;
 
-    // Определяем, какие стейкхолдеры нужно добавить, а какие удалить
     const currentStakeIds = getCurrentProjectStakeIds();
     const stakesToAdd = selectedStakeIds.filter(id => !currentStakeIds.includes(id));
     const stakesToRemove = currentStakeIds.filter(id => !selectedStakeIds.includes(id));
 
-    // Выполняем мутации для добавления/удаления стейкхолдеров
     stakesToAdd.forEach(stakeId => {
       stakeMutation.mutate({
         stakeId,
