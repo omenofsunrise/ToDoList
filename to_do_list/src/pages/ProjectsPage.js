@@ -20,9 +20,33 @@ import {
   useMediaQuery,
   useTheme,
   Tabs,
-  Tab
+  Tab,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Input,
+  FormControl,
+  InputLabel,
+  FormHelperText
 } from '@mui/material';
-import { ExpandMore, ExpandLess, Edit, Delete, Add, CheckCircle, Cancel, SwapHoriz, SwitchAccount } from '@mui/icons-material';
+import { 
+  ExpandMore, 
+  ExpandLess, 
+  Edit, 
+  Delete, 
+  Add, 
+  CheckCircle, 
+  Cancel, 
+  SwapHoriz, 
+  SwitchAccount,
+  AttachFile,
+  Description,
+  Download,
+  CloudUpload
+} from '@mui/icons-material';
 import client from '../api/client';
 import useAuth from '../hooks/useAuth';
 import AddProjectForm from '../components/Projects/AddProjectForm';
@@ -58,7 +82,13 @@ const ProjectsPage = () => {
   const [selectStakesModalOpen, setSelectStakesModalOpen] = useState(false);
   const [selectedProjectForGoals, setSelectedProjectForGoals] = useState(null);
   const [selectedProjectForStakes, setSelectedProjectForStakes] = useState(null);
-  
+  const [documentModalOpen, setDocumentModalOpen] = useState(false);
+  const [selectedTaskForDocument, setSelectedTaskForDocument] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [taskDocuments, setTaskDocuments] = useState({});
+  const [documentPreviewOpen, setDocumentPreviewOpen] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState(null);
+
   useAuth();
 
   useEffect(() => {
@@ -76,6 +106,99 @@ const ProjectsPage = () => {
     },
   });
   
+  const fetchDocumentsForTask = async (taskId) => {
+    const response = await client.get(`/api/Document/task/${taskId}`);
+    return response.data;
+  };
+
+  const uploadDocumentMutation = useMutation({
+    mutationFn: (formData) => client.post('/api/Document/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['documents']);
+    },
+  });
+
+  const deleteDocumentMutation = useMutation({
+    mutationFn: (documentId) => client.delete(`/api/Document/${documentId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['documents']);
+    },
+  });
+
+  const handleFileChange = (event) => {
+    setSelectedFile(event.target.files[0]);
+  };
+
+  const handleUploadDocument = async () => {
+    if (!selectedFile || !selectedTaskForDocument) return;
+
+    const formData = new FormData();
+    formData.append('File', selectedFile);
+    formData.append('ProjectId', selectedTaskForDocument.idProject);
+    formData.append('TaskId', selectedTaskForDocument.idTask);
+
+    try {
+      await uploadDocumentMutation.mutateAsync(formData);
+      setDocumentModalOpen(false);
+      setSelectedFile(null);
+      
+      // Refresh documents for this task
+      const docs = await fetchDocumentsForTask(selectedTaskForDocument.idTask);
+      setTaskDocuments(prev => ({
+        ...prev,
+        [selectedTaskForDocument.idTask]: docs
+      }));
+    } catch (error) {
+      console.error('Error uploading document:', error);
+    }
+  };
+
+  const handleDeleteDocument = async (documentId, taskId) => {
+    if (!documentId) return;
+    
+    try {
+      await deleteDocumentMutation.mutateAsync(documentId);
+      const docs = await fetchDocumentsForTask(taskId);
+      setTaskDocuments(prev => ({
+        ...prev,
+        [taskId]: docs
+      }));
+    } catch (error) {
+      console.error('Error deleting document:', error);
+    }
+  };
+
+  const handlePreviewDocument = async (document) => {
+    try {
+      const response = await client.get(`/api/Document/download/${document.id}`, {
+        responseType: 'blob'
+      });
+      
+      const fileURL = URL.createObjectURL(response.data);
+      setPreviewDocument({
+        ...document,
+        url: fileURL
+      });
+      setDocumentPreviewOpen(true);
+    } catch (error) {
+      console.error('Error downloading document:', error);
+    }
+  };
+
+  const loadDocumentsForTask = async (taskId) => {
+    if (!taskDocuments[taskId]) {
+      const docs = await fetchDocumentsForTask(taskId);
+      setTaskDocuments(prev => ({
+        ...prev,
+        [taskId]: docs
+      }));
+    }
+  };
+
   const checkAdminAccess = async (token) => {
     try {
       const response = await client.get('/api/Account/access', {
@@ -520,11 +643,23 @@ const removeUserFromProjectMutation = useMutation({
     setEditingStake(null);
   };
 
-  const handleExpand = (projectId) => {
+  const handleExpand = async (projectId) => {
     if (expandedProjectId === projectId) {
       setExpandedProjectId(null);
     } else {
       setExpandedProjectId(projectId);
+      
+      // Загружаем документы для всех задач проекта
+      const tasksForProject = allTasks.filter(task => task.idProject === projectId);
+      for (const task of tasksForProject) {
+        if (!taskDocuments[task.idTask]) {
+          const docs = await fetchDocumentsForTask(task.idTask);
+          setTaskDocuments(prev => ({
+            ...prev,
+            [task.idTask]: docs
+          }));
+        }
+      }
     }
   };
 
@@ -1039,6 +1174,47 @@ const removeUserFromProjectMutation = useMutation({
                 <Add fontSize="small" />
               </IconButton>
             </Box>
+
+            {/* Documents section */}
+                              <Box sx={{ mt: 2, width: '100%' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                  Отчёт:
+                                </Typography>
+                                
+                                {taskDocuments[task.idTask]?.length > 0 ? (
+                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                    {taskDocuments[task.idTask].map((doc) => (
+                                      <Chip
+                                        key={doc.idDocument}
+                                        icon={<Description />}
+                                        label={doc.originalName}
+                                        onClick={() => handlePreviewDocument(doc)}
+                                        onDelete={() => handleDeleteDocument(doc.id, task.idTask)}
+                                        deleteIcon={<Delete />}
+                                        variant="outlined"
+                                        sx={{ maxWidth: 200 }}
+                                      />
+                                    ))}
+                                  </Box>
+                                ) : (
+                                  <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                                    Отчёт не готов
+                                  </Typography>
+                                )}
+                                
+                                <Button
+                                  variant="outlined"
+                                  startIcon={<AttachFile />}
+                                  onClick={() => {
+                                    setSelectedTaskForDocument(task);
+                                    setDocumentModalOpen(true);
+                                    loadDocumentsForTask(task.idTask);
+                                  }}
+                                  sx={{ mt: 1 }}
+                                >
+                                  Добавить отчёт
+                                </Button>
+                              </Box>
           </ListItem>
 
           {index < tasksArray.length - 1 && <Divider sx={{ my: 2 }} />}
@@ -1050,6 +1226,72 @@ const removeUserFromProjectMutation = useMutation({
               );
             })}
           </List>
+
+              {/* Document Upload Modal */}
+          <Dialog open={documentModalOpen} onClose={() => setDocumentModalOpen(false)}>
+            <DialogTitle>Добавить документ к задаче</DialogTitle>
+            <DialogContent>
+              <FormControl fullWidth sx={{ mt: 2 }}>
+                <InputLabel htmlFor="document-upload">Выберите файл</InputLabel>
+                <Input
+                  id="document-upload"
+                  type="file"
+                  onChange={handleFileChange}
+                  inputProps={{ accept: '.pdf,.doc,.docx,.xls,.xlsx,.txt' }}
+                  startAdornment={<CloudUpload />}
+                />
+                <FormHelperText>
+                  Поддерживаемые форматы: PDF, Word, Excel, TXT
+                </FormHelperText>
+              </FormControl>
+              {selectedFile && (
+                <Typography variant="body2" sx={{ mt: 2 }}>
+                  Выбран файл: {selectedFile.name}
+                </Typography>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setDocumentModalOpen(false)}>Отмена</Button>
+              <Button 
+                onClick={handleUploadDocument} 
+                disabled={!selectedFile}
+                variant="contained"
+                color="primary"
+              >
+                Загрузить
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Document Preview Modal */}
+          <Dialog 
+            open={documentPreviewOpen} 
+            onClose={() => setDocumentPreviewOpen(false)}
+            maxWidth="md"
+            fullWidth
+          >
+            <DialogTitle>{previewDocument?.originalName}</DialogTitle>
+            <DialogContent>
+              {previewDocument && (
+                <iframe 
+                  src={previewDocument.url} 
+                  width="100%" 
+                  height="500px"
+                  title={previewDocument.originalName}
+                  style={{ border: 'none' }}
+                />
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button 
+                onClick={() => window.open(previewDocument?.url, '_blank')}
+                startIcon={<Download />}
+              >
+                Скачать
+              </Button>
+              <Button onClick={() => setDocumentPreviewOpen(false)}>Закрыть</Button>
+            </DialogActions>
+          </Dialog>
 
           <Modal open={addingProject} onClose={() => setAddingProject(false)}>
             <Box
