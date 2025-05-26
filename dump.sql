@@ -16,6 +16,41 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Table structure for table `documents`
+--
+
+DROP TABLE IF EXISTS `documents`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `documents` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `project_id` int DEFAULT NULL,
+  `task_id` int DEFAULT NULL,
+  `file_name` varchar(255) NOT NULL,
+  `original_name` varchar(255) NOT NULL,
+  `file_path` varchar(512) NOT NULL,
+  `upload_date` datetime NOT NULL,
+  `uploaded_by` int NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `project_id` (`project_id`),
+  KEY `task_id` (`task_id`),
+  KEY `uploaded_by` (`uploaded_by`),
+  CONSTRAINT `documents_ibfk_1` FOREIGN KEY (`project_id`) REFERENCES `project` (`idProject`) ON DELETE CASCADE,
+  CONSTRAINT `documents_ibfk_2` FOREIGN KEY (`task_id`) REFERENCES `task` (`idTask`) ON DELETE CASCADE,
+  CONSTRAINT `documents_ibfk_3` FOREIGN KEY (`uploaded_by`) REFERENCES `user` (`idUser`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `documents`
+--
+
+LOCK TABLES `documents` WRITE;
+/*!40000 ALTER TABLE `documents` DISABLE KEYS */;
+/*!40000 ALTER TABLE `documents` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `goal`
 --
 
@@ -63,7 +98,7 @@ CREATE TABLE `goal_has_project` (
 
 LOCK TABLES `goal_has_project` WRITE;
 /*!40000 ALTER TABLE `goal_has_project` DISABLE KEYS */;
-INSERT INTO `goal_has_project` VALUES (59,97),(60,97),(64,97);
+INSERT INTO `goal_has_project` VALUES (63,97),(64,97),(60,98),(61,98);
 /*!40000 ALTER TABLE `goal_has_project` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -82,7 +117,7 @@ CREATE TABLE `project` (
   `description` varchar(45) DEFAULT NULL,
   `completed` tinyint DEFAULT '0',
   PRIMARY KEY (`idProject`)
-) ENGINE=InnoDB AUTO_INCREMENT=98 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=106 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -91,7 +126,7 @@ CREATE TABLE `project` (
 
 LOCK TABLES `project` WRITE;
 /*!40000 ALTER TABLE `project` DISABLE KEYS */;
-INSERT INTO `project` VALUES (46,'ТЕСТ','2025-03-15','1 месяц','ТЕСТ',0),(59,'123','2025-03-16','123','123',0),(81,'тест','2025-03-21','ываываы','тест',0),(82,'фыв','2025-03-21','яыв','фыв',0),(83,'йоп','2025-03-21','Сделать to do list','asdasdasd',0),(85,'ывааыва','2025-03-21','фыв','фыв',0),(93,'ТЕСМТ','2025-03-21','фыв','фыв',0),(95,'тест','2025-03-21','тест','тест',0),(97,'Организовать логистику','2025-03-21','да','Между Саратовым и Москвой',0);
+INSERT INTO `project` VALUES (81,'тест','2025-03-21','ываываы','тест',0),(97,'Организовать логистику','2025-03-21','да','Между Саратовым и Москвой',0),(98,'sadsfsdf','2025-05-26','sdfsdfsdf','sdfsdfsdf',0);
 /*!40000 ALTER TABLE `project` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -143,7 +178,7 @@ CREATE TABLE `stakeholder_has_project` (
 
 LOCK TABLES `stakeholder_has_project` WRITE;
 /*!40000 ALTER TABLE `stakeholder_has_project` DISABLE KEYS */;
-INSERT INTO `stakeholder_has_project` VALUES (29,97),(32,97),(33,97);
+INSERT INTO `stakeholder_has_project` VALUES (29,97),(32,97),(33,97),(29,98);
 /*!40000 ALTER TABLE `stakeholder_has_project` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -173,7 +208,7 @@ CREATE TABLE `task` (
 
 LOCK TABLES `task` WRITE;
 /*!40000 ALTER TABLE `task` DISABLE KEYS */;
-INSERT INTO `task` VALUES (28,'CREATE','CR','2025-03-15',46,1),(29,'UPDATE','UP','2025-03-15',46,0),(30,'READ','RD','2025-03-15',46,0),(31,'DELETE','DEL','2025-03-15',46,0),(72,'Рассчитать издержки','и тд ','2025-03-21',97,1),(73,'Увеличить штат трактористов','статы','2025-03-21',97,1);
+INSERT INTO `task` VALUES (72,'Рассчитать издержки','и тд ','2025-03-21',97,1),(73,'Увеличить штат трактористов','статы','2025-03-21',97,0);
 /*!40000 ALTER TABLE `task` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -203,7 +238,7 @@ CREATE TABLE `user` (
 
 LOCK TABLES `user` WRITE;
 /*!40000 ALTER TABLE `user` DISABLE KEYS */;
-INSERT INTO `user` VALUES (12,'hash','test','test','rgWg5V5xjIlW6rDdGf5lKaZqnZE00cvrHZSOAmigM18=','xQadzJvie8t4HiK8WGZ3Mg==',1),(16,'anger101','Михаил','Матвиенко','V9sJcaoiDvJpd6swKrLdCGohWv9Qb9empmszUPz3ggE=','t+oE+5Q066AAMjQCavGmPw==',0),(19,'mrTvister','Дмитрий','Константинович','5qgCd6/4CwzkjqvSsuUZVnfJY22buMuH1bH+Bic/ZOE=','l4v65qh53OAV+I/J3HB/vQ==',0);
+INSERT INTO `user` VALUES (12,'hash','test','test','rgWg5V5xjIlW6rDdGf5lKaZqnZE00cvrHZSOAmigM18=','xQadzJvie8t4HiK8WGZ3Mg==',1),(16,'anger101','Михаил','Матвиенко','VhC42zM1RQgEqivaULWTTp9bAXf94J6CylKbheDtn70=','rNqep0kYLRhVW4ChP2NrGA==',0),(19,'mrTvister','Дмитрий','Константинович','5qgCd6/4CwzkjqvSsuUZVnfJY22buMuH1bH+Bic/ZOE=','l4v65qh53OAV+I/J3HB/vQ==',0);
 /*!40000 ALTER TABLE `user` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -273,4 +308,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-03-23 15:03:40
+-- Dump completed on 2025-05-26 22:08:19
