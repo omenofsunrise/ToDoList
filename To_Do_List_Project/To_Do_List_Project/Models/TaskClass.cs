@@ -1,4 +1,6 @@
-﻿namespace react_api.Models
+﻿using react_api.Controllers;
+
+namespace react_api.Models
 {
     public class TaskClass
     {
@@ -8,5 +10,7 @@
         public DateTime deadLine { get; set; }
         public int idProject { get; set; }
         public bool status { get; set; }
+        public List<UserTaskRole> UserRoles { get; set; }
+        public List<Document> Documents { get; set; } = new List<Document>();
     }
 }
