@@ -14,8 +14,9 @@ import {
   useTheme,
   Checkbox,
   ListItemText,
+  Chip
 } from '@mui/material';
-import { Delete } from '@mui/icons-material';
+import { Delete, AttachFile } from '@mui/icons-material';
 import client from '../../api/client';
 import { useQuery } from '@tanstack/react-query';
 import { keyframes } from '@emotion/react';
@@ -46,6 +47,8 @@ const AddProjectForm = ({ onSubmit, onCancel, onClose }) => {
   const [observerUsers, setObserverUsers] = useState([]); 
   const [tasksData, setTasksData] = useState([]); 
   const [errors, setErrors] = useState({});
+  const [files, setFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
 
   const queryClient = useQueryClient();
   const theme = useTheme();
@@ -76,6 +79,39 @@ const AddProjectForm = ({ onSubmit, onCancel, onClose }) => {
     setTasksData(newTasksData);
   };
   
+  const handleFileChange = (e) => {
+    const newFiles = Array.from(e.target.files);
+    setFiles([...files, ...newFiles]);
+  };
+
+  const handleRemoveFile = (index) => {
+    const newFiles = [...files];
+    newFiles.splice(index, 1);
+    setFiles(newFiles);
+  };
+
+  const uploadFiles = async (projectId) => {
+    setUploading(true);
+    try {
+      await Promise.all(
+        files.map(async (file) => {
+          const formData = new FormData();
+          formData.append('File', file);
+          formData.append('ProjectId', projectId);
+          await client.post('/api/Document/upload', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+        })
+      );
+    } catch (error) {
+      console.error('Error uploading files:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleTaskObserverUsersChange = (index, selectedUsers) => {
     const newTasksData = [...tasksData];
     newTasksData[index].observerUsers = selectedUsers;
@@ -159,7 +195,7 @@ const AddProjectForm = ({ onSubmit, onCancel, onClose }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
@@ -180,7 +216,19 @@ const AddProjectForm = ({ onSubmit, onCancel, onClose }) => {
       })),
     };
 
-    onSubmit(projectPayload, selectedStakes, selectedGoals, responsibleUsers, observerUsers, tasksData);
+    try {
+      await onSubmit(projectPayload, selectedStakes, selectedGoals, responsibleUsers, observerUsers, tasksData);
+      
+      if (files.length > 0) {
+        const response = await client.get('/api/project/max', {});
+        const projectId = response.data;
+        await uploadFiles(projectId);
+      }
+      
+      onClose();
+    } catch (error) {
+      console.error('Error creating project or uploading files:', error);
+    }
   };
 
   const handleCancel = () => {
@@ -345,6 +393,40 @@ const AddProjectForm = ({ onSubmit, onCancel, onClose }) => {
     ))}
   </Select>
 </FormControl>
+
+
+      <Typography variant="h6" component="h3" gutterBottom sx={{ mt: 2 }}>
+        Файлы проекта
+      </Typography>
+      
+      <Box sx={{ mb: 3 }}>
+        <Button
+          variant="outlined"
+          component="label"
+          startIcon={<AttachFile />}
+          sx={{ mb: 2 }}
+        >
+          Добавить файлы
+          <input
+            type="file"
+            hidden
+            multiple
+            onChange={handleFileChange}
+          />
+        </Button>
+        
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          {files.map((file, index) => (
+            <Chip
+              key={index}
+              label={file.name}
+              onDelete={() => handleRemoveFile(index)}
+              variant="outlined"
+              sx={{ maxWidth: 200 }}
+            />
+          ))}
+        </Box>
+      </Box>
 
       <Typography variant="h6" component="h3" gutterBottom>
         Задачи

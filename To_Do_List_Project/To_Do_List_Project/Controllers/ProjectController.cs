@@ -201,6 +201,36 @@ namespace react_api.Controllers
             return new JsonResult(filteredProjects);
         }
 
+        [HttpGet("max")]
+        public async Task<IActionResult> GetMaxProjectId()
+        {
+            string query = "SELECT MAX(idProject) FROM project";
+            string MySqlDataSource = _configuration.GetConnectionString("AppCon");
+
+            try
+            {
+                using (MySqlConnection myCon = new MySqlConnection(MySqlDataSource))
+                {
+                    await myCon.OpenAsync();
+                    using (MySqlCommand myCommand = new MySqlCommand(query, myCon))
+                    {
+                        var result = await myCommand.ExecuteScalarAsync();
+
+                        if (result == null || result == DBNull.Value)
+                        {
+                            return Ok(0);
+                        }
+
+                        return Ok(Convert.ToInt32(result));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Internal server error", error = ex.Message });
+            }
+        }
+
         [HttpPost]
         public JsonResult Post(ProjectPostClass project)
         {

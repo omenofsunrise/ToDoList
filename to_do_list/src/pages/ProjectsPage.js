@@ -88,9 +88,91 @@ const ProjectsPage = () => {
   const [taskDocuments, setTaskDocuments] = useState({});
   const [documentPreviewOpen, setDocumentPreviewOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState(null);
+  const [projectDocuments, setProjectDocuments] = useState({});
+  const [selectedProjectForDocument, setSelectedProjectForDocument] = useState(null);
+  const [projectDocumentModalOpen, setProjectDocumentModalOpen] = useState(false);
 
   useAuth();
 
+  const fetchDocumentsForProject = async (projectId) => {
+    const response = await client.get(`/api/Document/project/${projectId}`);
+    return response.data;
+  };
+
+  const handleUploadProjectDocument = async () => {
+    if (!selectedFile || !selectedProjectForDocument) return;
+
+    const formData = new FormData();
+    formData.append('File', selectedFile);
+    formData.append('ProjectId', selectedProjectForDocument.idProject);
+
+    try {
+      await uploadDocumentMutation.mutateAsync(formData);
+      setProjectDocumentModalOpen(false);
+      setSelectedFile(null);
+      
+      const docs = await fetchDocumentsForProject(selectedProjectForDocument.idProject);
+      setProjectDocuments(prev => ({
+        ...prev,
+        [selectedProjectForDocument.idProject]: docs
+      }));
+    } catch (error) {
+      console.error('Error uploading project document:', error);
+    }
+  };
+
+  const fetchAllDocuments = async () => {
+    const tasksDocs = {};
+    const projectsDocs = {};
+
+    for (const task of allTasks) {
+      try {
+        const docs = await fetchDocumentsForTask(task.idTask);
+        tasksDocs[task.idTask] = docs;
+      } catch (error) {
+        console.error(`Error fetching documents for task ${task.idTask}:`, error);
+        tasksDocs[task.idTask] = [];
+      }
+    }
+
+    for (const project of projects) {
+      try {
+        const docs = await fetchDocumentsForProject(project.idProject);
+        projectsDocs[project.idProject] = docs;
+      } catch (error) {
+        console.error(`Error fetching documents for project ${project.idProject}:`, error);
+        projectsDocs[project.idProject] = [];
+      }
+    }
+
+    return { tasksDocs, projectsDocs };
+  };
+
+  const handleDeleteProjectDocument = async (documentId, projectId) => {
+    if (!documentId) return;
+    
+    try {
+      await deleteDocumentMutation.mutateAsync(documentId);
+      const docs = await fetchDocumentsForProject(projectId);
+      setProjectDocuments(prev => ({
+        ...prev,
+        [projectId]: docs
+      }));
+    } catch (error) {
+      console.error('Error deleting project document:', error);
+    }
+  };
+
+  const loadDocumentsForProject = async (projectId) => {
+    if (!projectDocuments[projectId]) {
+      const docs = await fetchDocumentsForProject(projectId);
+      setProjectDocuments(prev => ({
+        ...prev,
+        [projectId]: docs
+      }));
+    }
+  };  
+  
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     if (token) {
@@ -146,7 +228,6 @@ const ProjectsPage = () => {
       setDocumentModalOpen(false);
       setSelectedFile(null);
       
-      // Refresh documents for this task
       const docs = await fetchDocumentsForTask(selectedTaskForDocument.idTask);
       setTaskDocuments(prev => ({
         ...prev,
@@ -587,6 +668,18 @@ const removeUserFromProjectMutation = useMutation({
     }
   };
   
+  useEffect(() => {
+    if (allTasks.length > 0 && projects.length > 0) {
+      const loadAllDocuments = async () => {
+        const { tasksDocs, projectsDocs } = await fetchAllDocuments();
+        setTaskDocuments(tasksDocs);
+        setProjectDocuments(projectsDocs);
+      };
+      
+      loadAllDocuments();
+    }
+  }, [allTasks, projects]);
+  
   const handleCancel = () => {
     console.log('Форма отменена');
   };
@@ -649,7 +742,6 @@ const removeUserFromProjectMutation = useMutation({
     } else {
       setExpandedProjectId(projectId);
       
-      // Загружаем документы для всех задач проекта
       const tasksForProject = allTasks.filter(task => task.idProject === projectId);
       for (const task of tasksForProject) {
         if (!taskDocuments[task.idTask]) {
@@ -695,7 +787,7 @@ const removeUserFromProjectMutation = useMutation({
   };
 
   if (isProjectsLoading || isTasksLoading || isStakesLoading) return <CircularProgress />;
-
+  
   return (
     <Box
       sx={{
@@ -976,6 +1068,7 @@ const removeUserFromProjectMutation = useMutation({
         <Add fontSize="small" />
       </IconButton>
     </Box>
+    
     <AddUserModal
         open={addingUser}
         onClose={() => setAddingUser(false)}
@@ -1014,6 +1107,41 @@ const removeUserFromProjectMutation = useMutation({
       </Box>
     ))}
   </Box>
+
+  <IconButton
+  onClick={(e) => {
+    e.stopPropagation();
+    setSelectedProjectForDocument(project);
+    setProjectDocumentModalOpen(true);
+    loadDocumentsForProject(project.idProject);
+  }}
+  sx={{ color: 'primary.main' }}
+>
+  <AttachFile />
+</IconButton>
+
+{projectDocuments[project.idProject]?.length > 0 && (
+  <Box sx={{ width: '100%', pl: 2, pr: 2, mb: 2 }}>
+    <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+      Документы проекта:
+    </Typography>
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+      {projectDocuments[project.idProject].map((doc) => (
+        <Chip
+          key={doc.idDocument}
+          icon={<Description />}
+          label={doc.originalName}
+          onClick={() => handlePreviewDocument(doc)}
+          onDelete={() => handleDeleteProjectDocument(doc.id, project.idProject)}
+          deleteIcon={<Delete />}
+          variant="outlined"
+          sx={{ maxWidth: 200 }}
+        />
+      ))}
+    </Box>
+  </Box>
+)}
+
   <SelectStakesModal
     selectStakesModalOpen={selectStakesModalOpen}
     setSelectStakesModalOpen={setSelectStakesModalOpen}
@@ -1175,46 +1303,45 @@ const removeUserFromProjectMutation = useMutation({
               </IconButton>
             </Box>
 
-            {/* Documents section */}
-                              <Box sx={{ mt: 2, width: '100%' }}>
-                                <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                  Отчёт:
-                                </Typography>
-                                
-                                {taskDocuments[task.idTask]?.length > 0 ? (
-                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                    {taskDocuments[task.idTask].map((doc) => (
-                                      <Chip
-                                        key={doc.idDocument}
-                                        icon={<Description />}
-                                        label={doc.originalName}
-                                        onClick={() => handlePreviewDocument(doc)}
-                                        onDelete={() => handleDeleteDocument(doc.id, task.idTask)}
-                                        deleteIcon={<Delete />}
-                                        variant="outlined"
-                                        sx={{ maxWidth: 200 }}
-                                      />
-                                    ))}
-                                  </Box>
-                                ) : (
-                                  <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
-                                    Отчёт не готов
-                                  </Typography>
-                                )}
-                                
-                                <Button
-                                  variant="outlined"
-                                  startIcon={<AttachFile />}
-                                  onClick={() => {
-                                    setSelectedTaskForDocument(task);
-                                    setDocumentModalOpen(true);
-                                    loadDocumentsForTask(task.idTask);
-                                  }}
-                                  sx={{ mt: 1 }}
-                                >
-                                  Добавить отчёт
-                                </Button>
-                              </Box>
+            <Box sx={{ mt: 2, width: '100%' }}>
+              <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                Отчёт:
+              </Typography>
+              
+              {taskDocuments[task.idTask]?.length > 0 ? (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {taskDocuments[task.idTask].map((doc) => (
+                    <Chip
+                      key={doc.idDocument}
+                      icon={<Description />}
+                      label={doc.originalName}
+                      onClick={() => handlePreviewDocument(doc)}
+                      onDelete={() => handleDeleteDocument(doc.id, task.idTask)}
+                      deleteIcon={<Delete />}
+                      variant="outlined"
+                      sx={{ maxWidth: 200 }}
+                    />
+                  ))}
+                </Box>
+              ) : (
+                <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                  Отчёт не готов
+                </Typography>
+              )}
+              
+              <Button
+                variant="outlined"
+                startIcon={<AttachFile />}
+                onClick={() => {
+                  setSelectedTaskForDocument(task);
+                  setDocumentModalOpen(true);
+                  loadDocumentsForTask(task.idTask);
+                }}
+                sx={{ mt: 1 }}
+              >
+                Добавить отчёт
+              </Button>
+            </Box>
           </ListItem>
 
           {index < tasksArray.length - 1 && <Divider sx={{ my: 2 }} />}
@@ -1227,7 +1354,6 @@ const removeUserFromProjectMutation = useMutation({
             })}
           </List>
 
-              {/* Document Upload Modal */}
           <Dialog open={documentModalOpen} onClose={() => setDocumentModalOpen(false)}>
             <DialogTitle>Добавить документ к задаче</DialogTitle>
             <DialogContent>
@@ -1263,7 +1389,41 @@ const removeUserFromProjectMutation = useMutation({
             </DialogActions>
           </Dialog>
 
-          {/* Document Preview Modal */}
+              <Dialog open={projectDocumentModalOpen} onClose={() => setProjectDocumentModalOpen(false)}>
+                <DialogTitle>Добавить документ к проекту</DialogTitle>
+                <DialogContent>
+                  <FormControl fullWidth sx={{ mt: 2 }}>
+                    <InputLabel htmlFor="project-document-upload">Выберите файл</InputLabel>
+                    <Input
+                      id="project-document-upload"
+                      type="file"
+                      onChange={handleFileChange}
+                      inputProps={{ accept: '.pdf,.doc,.docx,.xls,.xlsx,.txt' }}
+                      startAdornment={<CloudUpload />}
+                    />
+                    <FormHelperText>
+                      Поддерживаемые форматы: PDF, Word, Excel, TXT
+                    </FormHelperText>
+                  </FormControl>
+                  {selectedFile && (
+                    <Typography variant="body2" sx={{ mt: 2 }}>
+                      Выбран файл: {selectedFile.name}
+                    </Typography>
+                  )}
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={() => setProjectDocumentModalOpen(false)}>Отмена</Button>
+                  <Button 
+                    onClick={handleUploadProjectDocument} 
+                    disabled={!selectedFile}
+                    variant="contained"
+                    color="primary"
+                  >
+                    Загрузить
+                  </Button>
+                </DialogActions>
+              </Dialog>
+
           <Dialog 
             open={documentPreviewOpen} 
             onClose={() => setDocumentPreviewOpen(false)}
